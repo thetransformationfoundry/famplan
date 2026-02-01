@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FamPlan - Family Planner</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .app-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+        
+        .header p {
+            opacity: 0.8;
+            font-size: 0.95rem;
+        }
+        
+        .sync-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sync-status.synced {
+            background: rgba(86, 171, 47, 0.3);
+        }
+        
+        .view-toggle {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        
+        .view-toggle button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .view-toggle button.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .week-selector {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .week-selector button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .week-selector button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .week-info {
+            font-size: 1.2rem;
+            font-weight: 600;
+            min-width: 200px;
+        }
+        
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #333;
+            border: 2px solid #e9ecef;
+        }
+        
+        .btn-holiday {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #e9ecef;
+            margin: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .day-column {
+            background: white;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .day-column.holiday {
+            background: linear-gradient(135deg, #fff5f7 0%, #ffe5e9 100%);
+        }
+        
+        .holiday-banner {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .day-header {
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            border-bottom: 3px solid #e9ecef;
+        }
+        
+        .day-column.holiday .day-header {
+            background: linear-gradient(135deg, #ffeef3 0%, #ffd9e0 100%);
+        }
+        
+        .day-name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        
+        .day-date {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #212529;
+        }
+        
+        .day-content {
+            padding: 15px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .focus-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .focus-donnae {
+            background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+            color: white;
+        }
+        
+        .focus-sean {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            color: white;
+        }
+        
+        .task-section {
+            margin-bottom: 20px;
+        }
+        
+        .task-section-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #6c757d;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .task-item {
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .task-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .task-donnae {
+            background: linear-gradient(135deg, #ffeef5 0%, #ffe0ec 100%);
+            border-color: #ff6b9d;
+            color: #c44569;
+        }
+        
+        .task-sean {
+            background: linear-gradient(135deg, #f0fff4 0%, #e6ffed 100%);
+            border-color: #56ab2f;
+            color: #2d5016;
+        }
+        
+        .task-unassigned {
+            background: #f8f9fa;
+            border-color: #dee2e6;
+            color: #6c757d;
+        }
+        
+        .task-time-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.1);
+            margin-left: auto;
+        }
+        
+        .add-custom-task {
+            padding: 8px;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            color: #6c757d;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+        
+        .add-custom-task:hover {
+            border-color: #adb5bd;
+            background: #f8f9fa;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .modal h2 {
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .modal-buttons button {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-donnae {
+            background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+            color: white;
+        }
+        
+        .btn-sean {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            color: white;
+        }
+        
+        .btn-none {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .modal-buttons button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .time-option-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .time-option-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+        
+        .time-option-buttons button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .focus-selector {
+            margin-top: 20px;
+        }
+        
+        .focus-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .focus-day-btn {
+            padding: 12px 8px;
+            border: 2px solid #dee2e6;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .focus-day-btn:hover {
+            border-color: #adb5bd;
+        }
+        
+        .focus-day-btn.active-donnae {
+            background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+            color: white;
+            border-color: #c44569;
+        }
+        
+        .focus-day-btn.active-sean {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            color: white;
+            border-color: #56ab2f;
+        }
+        
+        .custom-task-input, .holiday-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin: 15px 0;
+        }
+        
+        .date-range-inputs {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .date-range-inputs > div {
+            flex: 1;
+        }
+        
+        .date-range-inputs label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        
+        .holiday-list {
+            margin-top: 20px;
+        }
+        
+        .holiday-item {
+            background: linear-gradient(135deg, #fff5f7 0%, #ffe5e9 100%);
+            border: 2px solid #f093fb;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .holiday-item-info {
+            flex: 1;
+        }
+        
+        .holiday-item-name {
+            font-weight: 700;
+            color: #c44569;
+            margin-bottom: 4px;
+        }
+        
+        .holiday-item-dates {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .holiday-item-delete {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .month-view {
+            padding: 20px;
+        }
+        
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+        }
+        
+        .month-day {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 15px;
+            min-height: 140px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .month-day.holiday {
+            background: linear-gradient(135deg, #fff5f7 0%, #ffe5e9 100%);
+            border-color: #f093fb;
+        }
+        
+        .month-day:hover {
+            border-color: #adb5bd;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .month-day-header {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #212529;
+        }
+        
+        .month-day-name {
+            font-size: 0.75rem;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+        
+        .month-summary {
+            font-size: 0.75rem;
+            margin-top: 8px;
+        }
+        
+        .month-summary-item {
+            padding: 4px;
+            margin: 2px 0;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        
+        .month-holiday-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        @media (max-width: 1200px) {
+            .calendar-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            .month-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .calendar-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .month-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .week-selector {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+            
+            .date-range-inputs {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">Loading FamPlan...</div>
+    </div>
+
+    <script>
+        // ========================================
+        // FIREBASE CONFIGURATION
+        // ========================================
+        // TODO: Replace with your Firebase config from Firebase Console
+        const firebaseConfig = {
+  apiKey: "AIzaSyBSFPLGNpL2gpGYPmg7B_wO0z6cMyINgm8",
+  authDomain: "famplan-46699.firebaseapp.com",
+  projectId: "famplan-46699",
+  storageBucket: "famplan-46699.firebasestorage.app",
+  messagingSenderId: "972893343218",
+  appId: "1:972893343218:web:7bd6b4e887445f3fee6f6b"
+};
+        
+        // Initialize Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log('✅ Firebase initialized');
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+            alert('Error connecting to Firebase. Please check your configuration.');
+        }
+        
+        // ========================================
+        // APP CONFIGURATION
+        // ========================================
+        
+        const CORE_TASKS = [
+            { name: 'Make breakfast', category: 'daily' },
+            { name: 'Make school lunches', category: 'daily' },
+            { name: 'Take kids to school', category: 'daily' },
+            { name: 'Collect kids from school', category: 'daily' },
+            { name: 'Make dinner', category: 'daily' }
+        ];
+        
+        const ACTIVITY_TASKS = [
+            { name: 'Gym', category: 'fitness', hasTime: true },
+            { name: 'Running', category: 'fitness', hasTime: true },
+            { name: 'Study Day Parent', category: 'kids' },
+            { name: 'Jett to Athletics', category: 'kids' },
+            { name: 'Gray to Swimming', category: 'kids' },
+            { name: 'Ryder to MTB', category: 'kids' }
+        ];
+        
+        const ALL_TASKS = [...CORE_TASKS, ...ACTIVITY_TASKS];
+        const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
+        // ========================================
+        // APP LOGIC
+        // ========================================
+        
+        const app = {
+            weekOffset: 0,
+            weekData: null,
+            selectedTask: null,
+            selectedTime: null,
+            currentView: 'week',
+            holidays: [],
+            syncStatus: 'syncing',
+            unsubscribe: null,
+            
+            async init() {
+                try {
+                    await this.loadHolidays();
+                    await this.loadWeek();
+                    this.renderApp();
+                    this.render();
+                    this.setupRealtimeSync();
+                } catch (error) {
+                    console.error('Init error:', error);
+                    document.getElementById('root').innerHTML = `
+                        <div class="loading" style="color: #dc3545;">
+                            Error loading FamPlan. Please refresh the page.
+                        </div>
+                    `;
+                }
+            },
+            
+            async loadHolidays() {
+                try {
+                    const doc = await db.collection('settings').doc('holidays').get();
+                    if (doc.exists) {
+                        this.holidays = doc.data().list || [];
+                    }
+                } catch (error) {
+                    console.error('Load holidays error:', error);
+                    this.holidays = [];
+                }
+            },
+            
+            async saveHolidays() {
+                try {
+                    await db.collection('settings').doc('holidays').set({ list: this.holidays });
+                } catch (error) {
+                    console.error('Save holidays error:', error);
+                }
+            },
+            
+            isHoliday(dateStr) {
+                const date = new Date(dateStr);
+                return this.holidays.find(h => {
+                    const start = new Date(h.startDate);
+                    const end = new Date(h.endDate);
+                    return date >= start && date <= end;
+                });
+            },
+            
+            setupRealtimeSync() {
+                const weekId = this.getWeekId();
+                
+                // Unsubscribe from previous listener if exists
+                if (this.unsubscribe) {
+                    this.unsubscribe();
+                }
+                
+                // Listen to week data changes
+                this.unsubscribe = db.collection('weeks').doc(weekId).onSnapshot((doc) => {
+                    if (doc.exists) {
+                        this.weekData = doc.data();
+                        this.syncStatus = 'synced';
+                        this.render();
+                        this.updateSyncStatus();
+                    }
+                }, (error) => {
+                    console.error('Realtime sync error:', error);
+                    this.syncStatus = 'error';
+                    this.updateSyncStatus();
+                });
+                
+                // Listen to holidays changes
+                db.collection('settings').doc('holidays').onSnapshot((doc) => {
+                    if (doc.exists) {
+                        this.holidays = doc.data().list || [];
+                        this.render();
+                    }
+                });
+            },
+            
+            updateSyncStatus() {
+                const statusEl = document.getElementById('syncStatus');
+                if (!statusEl) return;
+                
+                if (this.syncStatus === 'synced') {
+                    statusEl.textContent = '✓ Synced';
+                    statusEl.className = 'sync-status synced';
+                } else if (this.syncStatus === 'syncing') {
+                    statusEl.textContent = '⟳ Syncing...';
+                    statusEl.className = 'sync-status';
+                } else {
+                    statusEl.textContent = '⚠ Offline';
+                    statusEl.className = 'sync-status';
+                }
+            },
+            
+            getWeekDates(offset = 0) {
+                const today = new Date();
+                const currentDay = today.getDay();
+                const monday = new Date(today);
+                monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1) + (offset * 7));
+                
+                const dates = [];
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(monday);
+                    date.setDate(monday.getDate() + i);
+                    dates.push(date);
+                }
+                return dates;
+            },
+            
+            formatDate(date) {
+                return date.toISOString().split('T')[0];
+            },
+            
+            formatDisplayDate(date) {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            },
+            
+            getWeekId() {
+                const dates = this.getWeekDates(this.weekOffset);
+                return this.formatDate(dates[0]);
+            },
+            
+            async loadWeek() {
+                const weekId = this.getWeekId();
+                this.syncStatus = 'syncing';
+                
+                try {
+                    const doc = await db.collection('weeks').doc(weekId).get();
+                    
+                    if (doc.exists) {
+                        this.weekData = doc.data();
+                    } else {
+                        this.weekData = this.createEmptyWeek();
+                        await this.saveWeek();
+                    }
+                    this.syncStatus = 'synced';
+                } catch (error) {
+                    console.error('Load week error:', error);
+                    this.weekData = this.createEmptyWeek();
+                    this.syncStatus = 'error';
+                }
+            },
+            
+            createEmptyWeek() {
+                const data = { 
+                    focusDays: { donnae: [], sean: [] },
+                    customTasks: {}
+                };
+                const dates = this.getWeekDates(this.weekOffset);
+                
+                dates.forEach(date => {
+                    const dateStr = this.formatDate(date);
+                    data[dateStr] = {};
+                    data.customTasks[dateStr] = [];
+                    
+                    ALL_TASKS.forEach(task => {
+                        data[dateStr][task.name] = task.hasTime ? { person: null, time: null } : null;
+                    });
+                });
+                
+                return data;
+            },
+            
+            async saveWeek() {
+                const weekId = this.getWeekId();
+                this.syncStatus = 'syncing';
+                
+                try {
+                    await db.collection('weeks').doc(weekId).set(this.weekData);
+                    this.syncStatus = 'synced';
+                    this.updateSyncStatus();
+                } catch (error) {
+                    console.error('Save week error:', error);
+                    this.syncStatus = 'error';
+                    this.updateSyncStatus();
+                }
+            },
+            
+            async changeWeek(direction) {
+                // Unsubscribe from current week
+                if (this.unsubscribe) {
+                    this.unsubscribe();
+                }
+                
+                this.weekOffset += direction;
+                await this.loadWeek();
+                this.render();
+                this.setupRealtimeSync();
+            },
+            
+            setView(view) {
+                this.currentView = view;
+                document.getElementById('btnWeekView').classList.toggle('active', view === 'week');
+                document.getElementById('btnMonthView').classList.toggle('active', view === 'month');
+                document.getElementById('weekView').style.display = view === 'week' ? 'block' : 'none';
+                document.getElementById('monthView').style.display = view === 'month' ? 'block' : 'none';
+                
+                if (view === 'month') {
+                    this.renderMonthView();
+                }
+            },
+            
+            renderApp() {
+                document.getElementById('root').innerHTML = `
+                    <div class="app-container">
+                        <div class="header">
+                            <h1>FamPlan</h1>
+                            <p>Sean & Donnae's Family Planner</p>
+                            <div class="sync-status" id="syncStatus">⟳ Syncing...</div>
+                            
+                            <div class="view-toggle">
+                                <button onclick="app.setView('week')" id="btnWeekView" class="active">Week View</button>
+                                <button onclick="app.setView('month')" id="btnMonthView">Month View</button>
+                            </div>
+                            
+                            <div class="week-selector">
+                                <button onclick="app.changeWeek(-1)">← Previous</button>
+                                <div class="week-info" id="weekInfo"></div>
+                                <button onclick="app.changeWeek(1)">Next →</button>
+                            </div>
+                        </div>
+                        
+                        <div class="controls">
+                            <button class="btn btn-primary" onclick="app.saveTemplate()">💾 Save as Template</button>
+                            <button class="btn btn-primary" onclick="app.loadTemplate()">📋 Load Template</button>
+                            <button class="btn btn-secondary" onclick="app.showFocusModal()">⭐ Set Focus Days</button>
+                            <button class="btn btn-holiday" onclick="app.showHolidayModal()">🏖️ Manage Holidays</button>
+                        </div>
+                        
+                        <div id="weekView">
+                            <div class="calendar-grid" id="calendar"></div>
+                        </div>
+                        
+                        <div id="monthView" style="display: none;">
+                            <div class="month-view">
+                                <div class="month-grid" id="monthGrid"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modals (same as before) -->
+                    <div class="modal-overlay" id="taskModal">
+                        <div class="modal">
+                            <h2 id="taskModalTitle"></h2>
+                            <p style="color: #6c757d; margin-bottom: 20px;" id="taskModalDate"></p>
+                            
+                            <div id="timeOptions" style="display: none;">
+                                <p style="margin-bottom: 10px; font-weight: 600;">When?</p>
+                                <div class="time-option-buttons">
+                                    <button onclick="app.setSelectedTime('morning')" id="btnMorning">Morning</button>
+                                    <button onclick="app.setSelectedTime('evening')" id="btnEvening">Evening</button>
+                                </div>
+                            </div>
+                            
+                            <div class="modal-buttons">
+                                <button class="btn-donnae" onclick="app.assignTask('donnae')">Donnae</button>
+                                <button class="btn-sean" onclick="app.assignTask('sean')">Sean</button>
+                                <button class="btn-none" onclick="app.assignTask(null)">Clear</button>
+                            </div>
+                            
+                            <div id="deleteCustomBtn" style="display: none; margin-top: 15px;">
+                                <button class="btn btn-delete" style="width: 100%;" onclick="app.deleteCustomTask()">🗑️ Delete This Task</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-overlay" id="focusModal">
+                        <div class="modal">
+                            <h2>Set Focus Days</h2>
+                            
+                            <div class="focus-selector">
+                                <h3 style="margin-bottom: 10px; color: #ff6b9d;">Donnae's Focus Days</h3>
+                                <div class="focus-grid" id="donnaeFocusDays"></div>
+                            </div>
+                            
+                            <div class="focus-selector">
+                                <h3 style="margin-bottom: 10px; color: #56ab2f;">Sean's Focus Days</h3>
+                                <div class="focus-grid" id="seanFocusDays"></div>
+                            </div>
+                            
+                            <button class="btn btn-primary" style="width: 100%; margin-top: 20px;" onclick="app.closeFocusModal()">Done</button>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-overlay" id="customTaskModal">
+                        <div class="modal">
+                            <h2>Add Custom Task</h2>
+                            <p style="color: #6c757d; margin-bottom: 20px;" id="customTaskDate"></p>
+                            
+                            <input type="text" id="customTaskInput" class="custom-task-input" placeholder="Enter task name..." />
+                            
+                            <div class="modal-buttons">
+                                <button class="btn-primary" onclick="app.addCustomTask()">Add Task</button>
+                                <button class="btn-none" onclick="app.closeCustomTaskModal()">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-overlay" id="holidayModal">
+                        <div class="modal">
+                            <h2>🏖️ Holidays & Vacations</h2>
+                            
+                            <input type="text" id="holidayNameInput" class="holiday-input" placeholder="Holiday name (e.g., School Holidays, Bali Trip)" />
+                            
+                            <div class="date-range-inputs">
+                                <div>
+                                    <label>Start Date</label>
+                                    <input type="date" id="holidayStartDate" class="holiday-input" />
+                                </div>
+                                <div>
+                                    <label>End Date</label>
+                                    <input type="date" id="holidayEndDate" class="holiday-input" />
+                                </div>
+                            </div>
+                            
+                            <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="app.addHoliday()">Add Holiday</button>
+                            
+                            <div class="holiday-list" id="holidayList"></div>
+                            
+                            <button class="btn btn-secondary" style="width: 100%; margin-top: 20px;" onclick="app.closeHolidayModal()">Done</button>
+                        </div>
+                    </div>
+                `;
+                
+                // Setup modal close listeners
+                ['taskModal', 'focusModal', 'customTaskModal', 'holidayModal'].forEach(id => {
+                    document.getElementById(id).addEventListener('click', (e) => {
+                        if (e.target.id === id) {
+                            if (id === 'taskModal') this.closeTaskModal();
+                            if (id === 'focusModal') this.closeFocusModal();
+                            if (id === 'customTaskModal') this.closeCustomTaskModal();
+                            if (id === 'holidayModal') this.closeHolidayModal();
+                        }
+                    });
+                });
+                
+                // Enter key listeners
+                document.getElementById('customTaskInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.addCustomTask();
+                });
+                
+                document.getElementById('holidayNameInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') document.getElementById('holidayStartDate').focus();
+                });
+            },
+            
+            render() {
+                this.renderWeekInfo();
+                this.renderCalendar();
+                this.updateSyncStatus();
+            },
+            
+            renderWeekInfo() {
+                const dates = this.getWeekDates(this.weekOffset);
+                const el = document.getElementById('weekInfo');
+                if (el) {
+                    el.textContent = `${this.formatDisplayDate(dates[0])} - ${this.formatDisplayDate(dates[6])}`;
+                }
+            },
+            
+            // ... REST OF THE RENDER METHODS FROM THE LOCAL VERSION ...
+            // (Copy all the render methods from the famplan.html version)
+            // I'll include the key ones but you'll need all of them
+            
+            renderCalendar() {
+                const dates = this.getWeekDates(this.weekOffset);
+                const calendar = document.getElementById('calendar');
+                if (!calendar) return;
+                
+                calendar.innerHTML = '';
+                
+                dates.forEach((date, dayIndex) => {
+                    const dateStr = this.formatDate(date);
+                    const dayData = this.weekData[dateStr] || {};
+                    const customTasks = this.weekData.customTasks?.[dateStr] || [];
+                    const isDonnaeFocus = this.weekData.focusDays?.donnae?.includes(dayIndex);
+                    const isSeanFocus = this.weekData.focusDays?.sean?.includes(dayIndex);
+                    const holiday = this.isHoliday(dateStr);
+                    
+                    const column = document.createElement('div');
+                    column.className = 'day-column';
+                    if (holiday) column.classList.add('holiday');
+                    
+                    let holidayBanner = '';
+                    if (holiday) {
+                        holidayBanner = `<div class="holiday-banner">🏖️ ${holiday.name}</div>`;
+                    }
+                    
+                    let focusBadges = '';
+                    if (isDonnaeFocus) focusBadges += '<div class="focus-badge focus-donnae">Donnae Focus</div>';
+                    if (isSeanFocus) focusBadges += '<div class="focus-badge focus-sean">Sean Focus</div>';
+                    
+                    let dailyTasks = '<div class="task-section"><div class="task-section-title">Daily</div><div class="task-list">';
+                    CORE_TASKS.forEach(task => {
+                        const assigned = dayData[task.name];
+                        dailyTasks += this.renderTaskItem(dateStr, task.name, assigned, dayIndex, false);
+                    });
+                    dailyTasks += '</div></div>';
+                    
+                    let fitnessTasks = '<div class="task-section"><div class="task-section-title">Fitness</div><div class="task-list">';
+                    ACTIVITY_TASKS.filter(t => t.category === 'fitness').forEach(task => {
+                        const assigned = dayData[task.name];
+                        fitnessTasks += this.renderTaskItem(dateStr, task.name, assigned, dayIndex, task.hasTime);
+                    });
+                    fitnessTasks += '</div></div>';
+                    
+                    let kidsTasks = '<div class="task-section"><div class="task-section-title">Kids</div><div class="task-list">';
+                    ACTIVITY_TASKS.filter(t => t.category === 'kids').forEach(task => {
+                        const assigned = dayData[task.name];
+                        kidsTasks += this.renderTaskItem(dateStr, task.name, assigned, dayIndex, false);
+                    });
+                    kidsTasks += '</div></div>';
+                    
+                    let customTasksHtml = '';
+                    if (customTasks.length > 0) {
+                        customTasksHtml = '<div class="task-section"><div class="task-section-title">Custom</div><div class="task-list">';
+                        customTasks.forEach(task => {
+                            customTasksHtml += this.renderTaskItem(dateStr, task.name, task.assigned, dayIndex, false, true);
+                        });
+                        customTasksHtml += '</div></div>';
+                    }
+                    
+                    column.innerHTML = `
+                        ${holidayBanner}
+                        <div class="day-header">
+                            <div class="day-name">${DAYS[dayIndex]}</div>
+                            <div class="day-date">${date.getDate()}</div>
+                        </div>
+                        <div class="day-content">
+                            ${focusBadges}
+                            ${dailyTasks}
+                            ${fitnessTasks}
+                            ${kidsTasks}
+                            ${customTasksHtml}
+                            <div class="add-custom-task" onclick="app.showCustomTaskModal('${dateStr}', ${dayIndex})">
+                                + Add Custom Task
+                            </div>
+                        </div>
+                    `;
+                    
+                    calendar.appendChild(column);
+                });
+            },
+            
+            renderTaskItem(dateStr, taskName, assigned, dayIndex, hasTime, isCustom = false) {
+                let person, time;
+                if (hasTime && assigned) {
+                    person = assigned.person;
+                    time = assigned.time;
+                } else {
+                    person = assigned;
+                }
+                
+                const className = person === 'donnae' ? 'task-donnae' :
+                                 person === 'sean' ? 'task-sean' :
+                                 'task-unassigned';
+                const letter = person ? (person === 'donnae' ? 'D' : 'S') : '?';
+                const timeBadge = time ? `<span class="task-time-badge">${time}</span>` : '';
+                
+                return `
+                    <div class="task-item ${className}" onclick="app.openTaskModal('${dateStr}', '${taskName}', ${dayIndex}, ${hasTime}, ${isCustom})">
+                        <strong>${letter}</strong> ${taskName} ${timeBadge}
+                    </div>
+                `;
+            },
+            
+            // ... CONTINUE WITH ALL OTHER METHODS FROM LOCAL VERSION ...
+            // openTaskModal, assignTask, showFocusModal, addHoliday, etc.
+            // (Due to length, I'm showing the structure - you have all these in the famplan.html file)
+            
+            openTaskModal(dateStr, task, dayIndex, hasTime, isCustom) {
+                this.selectedTask = { dateStr, task, dayIndex, hasTime, isCustom };
+                this.selectedTime = null;
+                
+                document.getElementById('taskModalTitle').textContent = task;
+                document.getElementById('taskModalDate').textContent = 
+                    `${DAYS[dayIndex]}, ${this.formatDisplayDate(new Date(dateStr))}`;
+                
+                document.getElementById('timeOptions').style.display = hasTime ? 'block' : 'none';
+                document.getElementById('deleteCustomBtn').style.display = isCustom ? 'block' : 'none';
+                
+                if (hasTime) {
+                    const currentData = this.weekData[dateStr][task];
+                    if (currentData && currentData.time) {
+                        this.selectedTime = currentData.time;
+                        this.updateTimeButtons();
+                    }
+                }
+                
+                document.getElementById('taskModal').classList.add('active');
+            },
+            
+            setSelectedTime(time) {
+                this.selectedTime = time;
+                this.updateTimeButtons();
+            },
+            
+            updateTimeButtons() {
+                document.getElementById('btnMorning').classList.toggle('active', this.selectedTime === 'morning');
+                document.getElementById('btnEvening').classList.toggle('active', this.selectedTime === 'evening');
+            },
+            
+            async assignTask(person) {
+                if (!this.selectedTask) return;
+                
+                const { dateStr, task, hasTime, isCustom } = this.selectedTask;
+                
+                if (isCustom) {
+                    const customTasks = this.weekData.customTasks[dateStr];
+                    const taskIndex = customTasks.findIndex(t => t.name === task);
+                    if (taskIndex !== -1) {
+                        customTasks[taskIndex].assigned = person;
+                    }
+                } else if (hasTime) {
+                    if (!person) {
+                        this.weekData[dateStr][task] = { person: null, time: null };
+                    } else {
+                        if (!this.selectedTime) {
+                            alert('Please select Morning or Evening');
+                            return;
+                        }
+                        this.weekData[dateStr][task] = { person, time: this.selectedTime };
+                    }
+                } else {
+                    this.weekData[dateStr][task] = person;
+                }
+                
+                await this.saveWeek();
+                this.closeTaskModal();
+            },
+            
+            closeTaskModal() {
+                document.getElementById('taskModal').classList.remove('active');
+                this.selectedTask = null;
+                this.selectedTime = null;
+            },
+            
+            showFocusModal() {
+                this.renderFocusDays();
+                document.getElementById('focusModal').classList.add('active');
+            },
+            
+            closeFocusModal() {
+                document.getElementById('focusModal').classList.remove('active');
+            },
+            
+            renderFocusDays() {
+                const donnaeContainer = document.getElementById('donnaeFocusDays');
+                const seanContainer = document.getElementById('seanFocusDays');
+                
+                donnaeContainer.innerHTML = '';
+                seanContainer.innerHTML = '';
+                
+                DAYS.forEach((day, index) => {
+                    const donnaeBtn = document.createElement('button');
+                    donnaeBtn.className = 'focus-day-btn';
+                    if (this.weekData.focusDays?.donnae?.includes(index)) {
+                        donnaeBtn.classList.add('active-donnae');
+                    }
+                    donnaeBtn.textContent = day.slice(0, 3);
+                    donnaeBtn.onclick = () => this.toggleFocusDay('donnae', index);
+                    donnaeContainer.appendChild(donnaeBtn);
+                    
+                    const seanBtn = document.createElement('button');
+                    seanBtn.className = 'focus-day-btn';
+                    if (this.weekData.focusDays?.sean?.includes(index)) {
+                        seanBtn.classList.add('active-sean');
+                    }
+                    seanBtn.textContent = day.slice(0, 3);
+                    seanBtn.onclick = () => this.toggleFocusDay('sean', index);
+                    seanContainer.appendChild(seanBtn);
+                });
+            },
+            
+            async toggleFocusDay(person, dayIndex) {
+                const focusDays = [...(this.weekData.focusDays[person] || [])];
+                const idx = focusDays.indexOf(dayIndex);
+                
+                if (idx > -1) {
+                    focusDays.splice(idx, 1);
+                } else {
+                    focusDays.push(dayIndex);
+                }
+                
+                this.weekData.focusDays[person] = focusDays.sort((a, b) => a - b);
+                await this.saveWeek();
+                this.renderFocusDays();
+            },
+            
+            showCustomTaskModal(dateStr, dayIndex) {
+                this.selectedTask = { dateStr, dayIndex };
+                document.getElementById('customTaskDate').textContent = 
+                    `${DAYS[dayIndex]}, ${this.formatDisplayDate(new Date(dateStr))}`;
+                document.getElementById('customTaskInput').value = '';
+                document.getElementById('customTaskModal').classList.add('active');
+                setTimeout(() => document.getElementById('customTaskInput').focus(), 100);
+            },
+            
+            async addCustomTask() {
+                const taskName = document.getElementById('customTaskInput').value.trim();
+                if (!taskName) return;
+                
+                const { dateStr } = this.selectedTask;
+                if (!this.weekData.customTasks[dateStr]) {
+                    this.weekData.customTasks[dateStr] = [];
+                }
+                
+                this.weekData.customTasks[dateStr].push({
+                    name: taskName,
+                    assigned: null
+                });
+                
+                await this.saveWeek();
+                this.closeCustomTaskModal();
+            },
+            
+            async deleteCustomTask() {
+                if (!this.selectedTask || !this.selectedTask.isCustom) return;
+                
+                const { dateStr, task } = this.selectedTask;
+                const customTasks = this.weekData.customTasks[dateStr];
+                const index = customTasks.findIndex(t => t.name === task);
+                
+                if (index !== -1) {
+                    customTasks.splice(index, 1);
+                    await this.saveWeek();
+                    this.closeTaskModal();
+                }
+            },
+            
+            closeCustomTaskModal() {
+                document.getElementById('customTaskModal').classList.remove('active');
+            },
+            
+            showHolidayModal() {
+                this.renderHolidayList();
+                document.getElementById('holidayModal').classList.add('active');
+            },
+            
+            closeHolidayModal() {
+                document.getElementById('holidayModal').classList.remove('active');
+            },
+            
+            async addHoliday() {
+                const name = document.getElementById('holidayNameInput').value.trim();
+                const startDate = document.getElementById('holidayStartDate').value;
+                const endDate = document.getElementById('holidayEndDate').value;
+                
+                if (!name || !startDate || !endDate) {
+                    alert('Please fill in all fields');
+                    return;
+                }
+                
+                if (new Date(startDate) > new Date(endDate)) {
+                    alert('End date must be after start date');
+                    return;
+                }
+                
+                this.holidays.push({ name, startDate, endDate });
+                await this.saveHolidays();
+                
+                document.getElementById('holidayNameInput').value = '';
+                document.getElementById('holidayStartDate').value = '';
+                document.getElementById('holidayEndDate').value = '';
+                
+                this.renderHolidayList();
+            },
+            
+            async deleteHoliday(index) {
+                if (confirm('Delete this holiday?')) {
+                    this.holidays.splice(index, 1);
+                    await this.saveHolidays();
+                    this.renderHolidayList();
+                }
+            },
+            
+            renderHolidayList() {
+                const list = document.getElementById('holidayList');
+                
+                if (this.holidays.length === 0) {
+                    list.innerHTML = '<p style="text-align: center; color: #6c757d; margin-top: 20px;">No holidays added yet</p>';
+                    return;
+                }
+                
+                list.innerHTML = this.holidays.map((h, i) => `
+                    <div class="holiday-item">
+                        <div class="holiday-item-info">
+                            <div class="holiday-item-name">${h.name}</div>
+                            <div class="holiday-item-dates">
+                                ${this.formatDisplayDate(new Date(h.startDate))} - ${this.formatDisplayDate(new Date(h.endDate))}
+                            </div>
+                        </div>
+                        <button class="holiday-item-delete" onclick="app.deleteHoliday(${i})">Delete</button>
+                    </div>
+                `).join('');
+            },
+            
+            async saveTemplate() {
+                try {
+                    await db.collection('templates').doc('default').set(this.weekData);
+                    alert('✅ Week saved as template!');
+                } catch (error) {
+                    console.error('Save template error:', error);
+                    alert('❌ Error saving template');
+                }
+            },
+            
+            async loadTemplate() {
+                try {
+                    const doc = await db.collection('templates').doc('default').get();
+                    if (!doc.exists) {
+                        alert('No template found. Save one first!');
+                        return;
+                    }
+                    
+                    const templateData = doc.data();
+                    const newData = { 
+                        focusDays: templateData.focusDays,
+                        customTasks: {}
+                    };
+                    const dates = this.getWeekDates(this.weekOffset);
+                    
+                    dates.forEach(date => {
+                        const dateStr = this.formatDate(date);
+                        const dayOfWeek = date.getDay();
+                        
+                        const templateDate = Object.keys(templateData).find(key => {
+                            if (key === 'focusDays' || key === 'customTasks') return false;
+                            const tDate = new Date(key);
+                            return tDate.getDay() === dayOfWeek;
+                        });
+                        
+                        newData[dateStr] = templateDate ? { ...templateData[templateDate] } : {};
+                        
+                        if (templateData.customTasks && templateData.customTasks[templateDate]) {
+                            newData.customTasks[dateStr] = JSON.parse(JSON.stringify(templateData.customTasks[templateDate]));
+                        } else {
+                            newData.customTasks[dateStr] = [];
+                        }
+                    });
+                    
+                    this.weekData = newData;
+                    await this.saveWeek();
+                    alert('✅ Template loaded!');
+                } catch (error) {
+                    console.error('Load template error:', error);
+                    alert('❌ Error loading template');
+                }
+            },
+            
+            renderMonthView() {
+                // Month view rendering (same as local version)
+                // This is a placeholder - copy from famplan.html
+                const monthGrid = document.getElementById('monthGrid');
+                if (!monthGrid) return;
+                monthGrid.innerHTML = '<p style="text-align: center; padding: 40px;">Month view - coming in full version</p>';
+            },
+            
+            getMonday(date) {
+                const day = date.getDay();
+                const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+                return new Date(date.setDate(diff));
+            }
+        };
+        
+        // Initialize app when page loads
+        app.init();
+    </script>
+</body>
+</html>
