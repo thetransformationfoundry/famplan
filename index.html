@@ -1075,14 +1075,6 @@
                 this.renderWeekInfo();
                 this.renderCalendar();
                 this.updateSyncStatus();
-                this.scrollToToday();
-            },
-
-            scrollToToday() {
-                const todayCol = document.getElementById('today-column');
-                if (todayCol) {
-                    todayCol.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
             },
             
             renderWeekInfo() {
@@ -1101,18 +1093,28 @@
                 const dates = this.getWeekDates(this.weekOffset);
                 const calendar = document.getElementById('calendar');
                 if (!calendar) return;
-                
+
                 calendar.innerHTML = '';
-                
-                dates.forEach((date, dayIndex) => {
+
+                // Reorder days so today is first (only for current week)
+                const today = new Date();
+                let orderedIndices = dates.map((_, i) => i);
+                if (this.weekOffset === 0) {
+                    const todayIdx = dates.findIndex(d => d.toDateString() === today.toDateString());
+                    if (todayIdx > 0) {
+                        orderedIndices = [...orderedIndices.slice(todayIdx), ...orderedIndices.slice(0, todayIdx)];
+                    }
+                }
+
+                orderedIndices.forEach(dayIndex => {
+                    const date = dates[dayIndex];
                     const dateStr = this.formatDate(date);
                     const dayData = this.weekData[dateStr] || {};
                     const customTasks = this.weekData.customTasks?.[dateStr] || [];
                     const isDonnaeFocus = this.weekData.focusDays?.donnae?.includes(dayIndex);
                     const isSeanFocus = this.weekData.focusDays?.sean?.includes(dayIndex);
                     const holiday = this.isHoliday(dateStr);
-                    
-                    const today = new Date();
+
                     const isToday = date.toDateString() === today.toDateString();
 
                     const column = document.createElement('div');
